@@ -13,6 +13,6 @@ def post_event(url, data):
     
     :return: requests response object
     """
-    headers = {'Content-Type': 'application/json'}
+    headers = {"Content-Type": "application/json"}
     res = requests.post(url=url, json=data, headers=headers)
     return res
