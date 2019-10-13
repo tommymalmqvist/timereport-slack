@@ -15,18 +15,22 @@ REASONS: tuple = ("vab", "sick", "intern", "vacation")
 
 # Configure logger or die
 logger = logging.getLogger()
-logger.setLevel(os.getenv('log_level'))
+logger.setLevel(os.getenv("log_level"))
 
 
-app = Chalice(app_name='timereport')
+app = Chalice(app_name="timereport")
 app.debug = True
 
 
-@app.route('/interactive', method='POST', content_types=['application/x-www-form-urlencoded'])
+@app.route(
+    "/interactive", method="POST", content_types=["application/x-www-form-urlencoded"]
+)
 def interactive():
     return interactive_handler(app)
 
 
-@app.route('/command', methods=['POST'], content_types=['application/x-www-form-urlencoded'])
+@app.route(
+    "/command", methods=["POST"], content_types=["application/x-www-form-urlencoded"]
+)
 def command():
     return command_handler(app)
