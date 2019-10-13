@@ -1,3 +1,6 @@
+from dateutil.parser import parse
+
+
 def validate_reason(reason: str, reasons: tuple) -> bool:
     """Validates a given reason for an event
     :param reason: str
@@ -22,13 +25,8 @@ def validate_hours(hours: str) -> bool:
         return False
 
 
-def validate_command_len(command: list) -> bool:
-    """
-    Force length of command to be of len 3 or 4
-    :param command: list
-    :return: bool
-    """
-    if len(command) == 3 or len(command) == 4:
-        return True
-    else:
+def validate_date(date: str) -> bool:
+    if not parse(date, fuzzy=False):
         return False
+    else:
+        return True
