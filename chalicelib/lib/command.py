@@ -1,13 +1,10 @@
-import os
-
 from chalice import Chalice
 
-from app import TOKEN, SECRET, REASONS, API_URL
-from chalicelib.lib.slack import slack_payload_extractor, slack_responder
-from chalicelib.lib.security import verify_token
-from chalicelib.lib.validators import validate_hours, validate_reason, validate_date
+from app import SECRET, REASONS, API_URL
 from chalicelib.lib import api
-from dateutil.parser import parse
+from chalicelib.lib.security import verify_token
+from chalicelib.lib.slack import slack_payload_extractor, slack_responder
+from chalicelib.lib.validators import validate_hours, validate_reason, validate_date
 
 
 def command_handler(app: Chalice):
@@ -16,7 +13,7 @@ def command_handler(app: Chalice):
     to the correct function handler
     """
 
-    # store headers and request
+    # store headers, request
     headers = app.current_request.headers
     request = app.current_request.raw_body.decode()
 
@@ -24,7 +21,7 @@ def command_handler(app: Chalice):
     payload: dict = slack_payload_extractor(request)
     response_url: str = payload["response_url"][0]
 
-    # verify validity of request
+    # verify token
     if not verify_token(headers, request, SECRET):
         slack_responder(response_url, "Slack signing secret not valid")
         return ""
@@ -41,18 +38,23 @@ def command_handler(app: Chalice):
     # begin matching action
     if action == "add":
         slack_responder(response_url, add(command, user_id))
+        return ""
 
     elif action == "list":
         slack_responder(response_url, ls(command, user_id))
+        return ""
 
     elif action == "delete":
         slack_responder(response_url, delete(command, user_id))
+        return ""
 
     elif action == "lock":
         slack_responder(response_url, lock(command, user_id))
+        return ""
 
     elif action == "help":
         slack_responder(response_url, help_menu())
+        return ""
 
 
 def add(command: tuple, user_id: str) -> str:
@@ -77,33 +79,30 @@ def add(command: tuple, user_id: str) -> str:
         command = "add vab 2019-12-28 4"
     """
 
-    # validate length of command length to 3 or 4
+    # validate number of arguments: 3 or 4
     if not len(command) == 3 or len(command) == 4:
         return f"Wrong number of arguments: {len(command)}"
 
     # store and validate reason
     reason = command[1]
     if not validate_reason(reason=reason, reasons=REASONS):
-        return f"{reason}: not a valid input"
+        return f"arg reason: {reason} is invalid"
 
-    # store and validate hours
-    if len(command) == 3:
-        # no hours argument given, set default value
-        hours = 8
-    else:
+
+    # assign hours a default value of 8
+    hours = 8
+
+    # if hours argument was sent: reassing var hours and validate input
+    if len(command) == 4:
         hours = command[3]
         if not validate_hours(hours=hours):
-            return f"{hours}: not a valid input for hours"
+            return f"arg hours: {hours} is invalid"
 
     # store and validate date
     date = command[2]
+    
     if not validate_date(date=date):
-        return f"{date}: not a valid input for date"
-
-    # TODO: implement correct logic
-    #      [] validate reason
-    #      [] validate date and range
-    #      [] validate hours
+        return f"arg date: {date} is invalid"
 
     r = api.create(url=API_URL, event=event)
     if r.status_code != 200:
