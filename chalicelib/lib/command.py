@@ -5,7 +5,7 @@ from chalice import Chalice
 from app import TOKEN, SECRET, REASONS, API_URL
 from chalicelib.lib.slack import slack_payload_extractor, slack_responder
 from chalicelib.lib.security import verify_token
-from chalicelib.lib.validators import validate_hours, validate_reason, validate_command_len
+from chalicelib.lib.validators import validate_hours, validate_reason, validate_date
 from chalicelib.lib import api
 from dateutil.parser import parse
 
@@ -38,9 +38,7 @@ def command_handler(app: Chalice):
         slack_responder(response_url, help_menu())
         return ""
 
-    #########################
-    # begin matching action #
-    #########################
+    # begin matching action
     if action == "add":
         slack_responder(response_url, add(command, user_id))
 
@@ -79,23 +77,28 @@ def add(command: list, user_id: str) -> str:
         command = "add vab 2019-12-28 4"
     """
 
-    # validate length of input
-    if not validate_command_len(command=command):
+    # validate length of command length to 3 or 4
+    if not len(command) == 3 or len(command) == 4:
         return f"Wrong number of arguments: {len(command)}"
 
-    # validate reason
-    if not validate_reason(reason=command[1], reasons=REASONS):
-        return f"{command[1]}: not a valid input"
+    # store and validate reason
+    reason = command[1]
+    if not validate_reason(reason=reason, reasons=REASONS):
+        return f"{reason}: not a valid input"
 
-    # validate hours
-    try:
-        hours = command[3]
-    except IndexError:
-        # default to 8 hours if not given
+    # store and validate hours
+    if len(command) == 3:
+        # no hours argument given, set default value
         hours = 8
+    else:
+        hours = command[3]
+        if not validate_hours(hours=hours):
+            return f"{hours}: not a valid input for hours"
 
-    if not validate_hours(hours=hours):
-        return f"{hours}: not a valid input for hours"
+    # store and validate date
+    date = command[2]
+    if not validate_date(date=date):
+        return f"{date}: not a valid input for date"
 
     # TODO: implement correct logic
     #      [] validate reason
@@ -108,15 +111,24 @@ def add(command: list, user_id: str) -> str:
 
 
 def delete(command: list, user_id: str) -> str:
-    """Extracts user_id and date from payload and calls api.delete()"""
-    date: str = command[-1]
-    if parse(date, fuzzy=False):
-        r = api.delete(url=os.getenv("backend_url"), date=date, user_id=user_id)
+    """Extracts user_id and date from payload and calls api.delete()
+
+    TODO: add support for range
+    """
+
+    if not len(command) == 2:
+        return f"expected 2 arguments: {len(command)} given"
+
+    date: str = command[1]
+
+    if validate_date(date=date):
+        r = api.delete(url=API_URL, date=date, user_id=user_id)
         if r.status_code != 200:
-            return f"Could not lock {date}"
+            return f"Could not delete {date}"
     else:
-        return f"Could not parse {date}"
-    return f"{date} has been deleted"
+        return f"{date}: not a valid input for date"
+
+    return f"all events for {user_id} on {date} has been deleted"
 
 
 def ls(command: list, user_id: str) -> str:
@@ -127,11 +139,14 @@ def ls(command: list, user_id: str) -> str:
 def lock(command: list, user_id: str) -> str:
     """Extracts information from payload and calls api.lock()"""
 
+    if not len(command) == 2:
+        return f"expected 2 arguments: {len(command)} given"
+
     # store date
     date: str = command[-1]
 
     # check if date is valid
-    if parse(date, fuzzy=False):
+    if validate_date(date=date)
 
         r = api.lock(url=API_URL, user_id=user_id, date=date)
 
@@ -139,7 +154,7 @@ def lock(command: list, user_id: str) -> str:
             return f"Could not lock {date}"
 
     else:
-        return f"Could not parse {date}"
+        return f"{date}: not a valid input for date"
 
     return f"{date} has been locked"
 
