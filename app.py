@@ -9,6 +9,7 @@ from chalicelib.lib.command import command_handler
 TOKEN: str = f"{os.getenv('bot_access_token')}"
 SECRET: str = f"{os.getenv('signing_secret')}"
 API_URL: str = f"{os.getenv('backend_url')}"
+DATE_FORMAT: str = "%Y-%m-%d"
 
 # TODO: REASONS should load from env vars too
 REASONS: tuple = ("vab", "sick", "intern", "vacation")
