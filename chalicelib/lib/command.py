@@ -55,7 +55,7 @@ def command_handler(app: Chalice):
         slack_responder(response_url, help_menu())
 
 
-def add(command: list, user_id: str) -> str:
+def add(command: tuple, user_id: str) -> str:
     """Checks if reason and date are valid strings
 
     If date is range ("2019-12-28:2020-01-03") it will
@@ -110,7 +110,7 @@ def add(command: list, user_id: str) -> str:
         return "fail!"
 
 
-def delete(command: list, user_id: str) -> str:
+def delete(command: tuple, user_id: str) -> str:
     """Extracts user_id and date from payload and calls api.delete()
 
     TODO: add support for range
@@ -131,12 +131,12 @@ def delete(command: list, user_id: str) -> str:
     return f"all events for {user_id} on {date} has been deleted"
 
 
-def ls(command: list, user_id: str) -> str:
+def ls(command: tuple, user_id: str) -> str:
     return NotImplemented
     """Implements api.read() and Retrieves events for a range or defaults to current month"""
 
 
-def lock(command: list, user_id: str) -> str:
+def lock(command: tuple, user_id: str) -> str:
     """Extracts information from payload and calls api.lock()"""
 
     if not len(command) == 2:
@@ -159,7 +159,7 @@ def lock(command: list, user_id: str) -> str:
     return f"{date} has been locked"
 
 
-def help_menu(url: str) -> str:
+def help_menu() -> str:
     msg = """
         Perform action.
 
