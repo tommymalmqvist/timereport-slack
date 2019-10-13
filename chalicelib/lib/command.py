@@ -5,6 +5,7 @@ from chalice import Chalice
 from app import TOKEN, SECRET, REASONS, API_URL
 from chalicelib.lib.slack import slack_payload_extractor, slack_responder
 from chalicelib.lib.security import verify_token
+from chalicelib.lib.validators import validate_hours, validate_reason, validate_input
 from chalicelib.lib import api
 from dateutil.parser import parse
 
@@ -19,50 +20,58 @@ def command_handler(app: Chalice):
     headers = app.current_request.headers
     request = app.current_request.raw_body.decode()
 
-    # verify validity of request
-    if not verify_token(headers, request, SECRET):
-        return 'Slack signing secret not valid'
-
     # extract payload from request
     payload: dict = slack_payload_extractor(request)
+    response_url: str = payload["response_url"][0]
 
+    # verify validity of request
+    if not verify_token(headers, request, SECRET):
+        slack_responder(response_url, "Slack signing secret not valid")
+        return ""
+
+    # store command input, user_id and action
     try:
-        cmd: list = payload["text"][0].split()
-        user_id = payload["user_id"][0]
-        action: str = cmd[0]
+        command: tuple = tuple(payload["text"][0].split())
+        user_id: str = payload["user_id"][0]
+        action: str = command[0]
     except KeyError:
-        return help_menu(url=payload["response_url"][0])
+        slack_responder(response_url, help_menu())
+        return ""
 
+    #########################
+    # begin matching action #
+    #########################
     if action == "add":
-        return add(cmd, user_id)
+        slack_responder(response_url, add(command, user_id))
 
-    # TODO: should this exist?
-    # if action == "edit":
-    #     return "Not implemented"
+    elif action == "list":
+        slack_responder(response_url, ls(command, user_id))
 
-    if action == "delete":
-        return delete(cmd, user_id)
+    elif action == "delete":
+        slack_responder(response_url, delete(command, user_id))
 
-    if action == "list":
-        return ls(cmd, user_id)
+    elif action == "lock":
+        slack_responder(response_url, lock(command, user_id))
 
-    if action == "lock":
-        lock(cmd, user_id)
-
-    if action == "help":
-        help_menu(url=payload["response_url"][0])
+    elif action == "help":
+        slack_responder(response_url, help_menu())
 
 
-def add(cmd: list, user_id: str):
+def add(command: list, user_id: str) -> str:
     """Checks if reason and date are valid strings
+
     If date is range ("2019-12-28:2020-01-03") it will
     test if range is valid
-    :param cmd: list containing:
-        cmd[0] = action: str "add"
-        cmd[1] = reason: str ["vab", "sick", "intern"]
-        cmd[2] = date: str ["2019-12-28", "today", "today 8", "today 24", "2019-12-28:2020-01-03"]
-        cmd[3] = hours: OPTIONAL str: - hours is optional and defaults to 8 if not given
+
+    :param command: list containing:
+        command[0] = action: str "add"
+        command[1] = reason: str ["vab", "sick", "intern"]
+        command[2] = date: str ["2019-12-28", "today", "today 8", "today 24", "2019-12-28:2020-01-03"]
+        command[3] = hours: OPTIONAL str: - hours is optional and defaults to 8 if not given
     :param user_id: str: user_id
+    :param response_url: str: callback
+
+    :return str: sent to slack_responder
 
     Example data of command:
         command = "add vacation 2019-12-28:2020-01-03"
@@ -70,39 +79,39 @@ def add(cmd: list, user_id: str):
         command = "add vab 2019-12-28 4"
     """
 
+    # validate length of input
+    if not validate_input(command=command):
+        return f"Wrong number of arguments: {len(command)}"
+
     # validate reason
-    if not validate_reason(cmd[1]):
-        return "Not a valid reason"
+    if not validate_reason(reason=command[1], reasons=REASONS):
+        return f"{command[1]}: not a valid input"
 
     # validate hours
     try:
-        if not validate_hours(cmd[3]):
-            return "Not valid hours"
+        hours = command[3]
     except IndexError:
+        # default to 8 hours if not given
         hours = 8
+
+    if not validate_hours(hours=hours):
+        return f"{hours}: not a valid input for hours"
 
     # TODO: implement correct logic
     #      [] validate reason
     #      [] validate date and range
     #      [] validate hours
 
-    r = api.create(
-        url=os.getenv('backend_url'),
-        event=event
-    )
+    r = api.create(url=API_URL, event=event)
     if r.status_code != 200:
         return "fail!"
 
 
-def delete(cmd: list, user_id: str):
+def delete(command: list, user_id: str) -> str:
     """Extracts user_id and date from payload and calls api.delete()"""
-    date: str = cmd[-1]
+    date: str = command[-1]
     if parse(date, fuzzy=False):
-        r = api.delete(
-            url=os.getenv('backend_url'),
-            date=date,
-            user_id=user_id,
-        )
+        r = api.delete(url=os.getenv("backend_url"), date=date, user_id=user_id)
         if r.status_code != 200:
             return f"Could not lock {date}"
     else:
@@ -110,24 +119,21 @@ def delete(cmd: list, user_id: str):
     return f"{date} has been deleted"
 
 
-def ls(cmd: list, user_id: str):
+def ls(command: list, user_id: str) -> str:
+    return NotImplemented
     """Implements api.read() and Retrieves events for a range or defaults to current month"""
 
 
-def lock(cmd: list, user_id: str):
+def lock(command: list, user_id: str) -> str:
     """Extracts information from payload and calls api.lock()"""
 
     # store date
-    date: str = cmd[-1]
+    date: str = command[-1]
 
     # check if date is valid
     if parse(date, fuzzy=False):
 
-        r = api.lock(
-            url=API_URL,
-            user_id=user_id,
-            date=date
-        )
+        r = api.lock(url=API_URL, user_id=user_id, date=date)
 
         if r.status_code != 200:
             return f"Could not lock {date}"
@@ -138,7 +144,7 @@ def lock(cmd: list, user_id: str):
     return f"{date} has been locked"
 
 
-def help_menu(url: str):
+def help_menu(url: str) -> str:
     msg = """
         Perform action.
 
@@ -150,27 +156,4 @@ def help_menu(url: str):
         lock - Not implemented yet
         help - Provide this helpful output
         """
-    slack_responder(url=url, msg=msg)
-    return ""
-
-
-def validate_reason(reason: str) -> bool:
-    # TODO: should probably move to other lib
-    """Validates a given reason for an event
-    :param reason: str
-    :return: bool
-    """
-    if reason in REASONS:
-        return True
-    else:
-        return False
-
-
-def validate_hours(hours: str) -> bool:
-    # TODO: should probably move to other lib
-    if round(float(hours)) > 8:
-        return False
-    elif round(float(hours)) < 0:
-        return False
-    else:
-        return True
+    return msg
