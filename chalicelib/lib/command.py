@@ -5,7 +5,7 @@ from chalice import Chalice
 from app import TOKEN, SECRET, REASONS, API_URL
 from chalicelib.lib.slack import slack_payload_extractor, slack_responder
 from chalicelib.lib.security import verify_token
-from chalicelib.lib.validators import validate_hours, validate_reason, validate_input
+from chalicelib.lib.validators import validate_hours, validate_reason, validate_command_len
 from chalicelib.lib import api
 from dateutil.parser import parse
 
@@ -80,7 +80,7 @@ def add(command: list, user_id: str) -> str:
     """
 
     # validate length of input
-    if not validate_input(command=command):
+    if not validate_command_len(command=command):
         return f"Wrong number of arguments: {len(command)}"
 
     # validate reason

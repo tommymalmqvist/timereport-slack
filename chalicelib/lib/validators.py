@@ -19,7 +19,7 @@ def validate_hours(hours: str) -> bool:
         return True
 
 
-def validate_input(command: list) -> bool:
+def validate_command_len(command: list) -> bool:
     if len(command) < 3 or len(command) > 4:
         return False
     return True
